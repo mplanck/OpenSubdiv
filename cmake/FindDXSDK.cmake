@@ -48,6 +48,8 @@ if (WIN32)
     )
 
     if ("${CMAKE_GENERATOR}" MATCHES "[Ww]in64")
+
+    if ("${CMAKE_GENERATOR}" MATCHES "[wW]in64")
         set(ARCH x64)
     else()
         set(ARCH x86)
@@ -66,18 +68,17 @@ if (WIN32)
     )
 
     set(DXSDK_LIBRARY_DIR ${LIBRARY_DIR})
-
     foreach(DX_LIB d3d11 d3dcompiler)
 
         find_library(DXSDK_${DX_LIB}_LIBRARY
             NAMES 
                 ${DX_LIB}.lib
             PATHS
-                ${DXSDK_LIBRARY_DIR}
+                "${DXSDK_LIBRARY_DIR}"
+	    NO_DEFAULT_PATH
         )
 
         list(APPEND DXSDK_LIBRARIES ${DXSDK_${DX_LIB}_LIBRARY})
-
 
     endforeach(DX_LIB)
 
