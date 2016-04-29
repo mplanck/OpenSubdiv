@@ -898,7 +898,10 @@ PatchTableFactory::identifyAdaptivePatches(AdaptiveContext & context) {
             }
 
             //  Identify boundaries for both regular and xordinary patches -- non-manifold
-            //  edges and vertices are interpreted as boundaries for regular patches
+            //  (infinitely sharp) edges and vertices are currently interpreted as boundaries
+            //  for regular patches, though an irregular patch or extrapolated boundary patch
+            //  is really necessary in future for some non-manifold cases.
+            //
             if (hasBoundaryVertex or hasNonManifoldVertex) {
                 Vtr::ConstIndexArray fEdges = level->getFaceEdges(faceIndex);
 
@@ -911,6 +914,27 @@ PatchTableFactory::identifyAdaptivePatches(AdaptiveContext & context) {
                                          ((level->getEdgeTag(fEdges[1])._nonManifold) << 1) |
                                          ((level->getEdgeTag(fEdges[2])._nonManifold) << 2) |
                                          ((level->getEdgeTag(fEdges[3])._nonManifold) << 3);
+
+                    //  Other than non-manifold edges, non-manifold vertices that were made
+                    //  sharp should also trigger new "boundary" edges for the sharp corner
+                    //  patches introduced in these cases.
+                    //
+                    if (level->getVertexTag(fVerts[0])._nonManifold &&
+                        level->getVertexTag(fVerts[0])._infSharp) {
+                        nonManEdgeMask |= (1 << 0) | (1 << 3);
+                    }
+                    if (level->getVertexTag(fVerts[1])._nonManifold &&
+                        level->getVertexTag(fVerts[1])._infSharp) {
+                        nonManEdgeMask |= (1 << 1) | (1 << 0);
+                    }
+                    if (level->getVertexTag(fVerts[2])._nonManifold &&
+                        level->getVertexTag(fVerts[2])._infSharp) {
+                        nonManEdgeMask |= (1 << 2) | (1 << 1);
+                    }
+                    if (level->getVertexTag(fVerts[3])._nonManifold &&
+                        level->getVertexTag(fVerts[3])._infSharp) {
+                        nonManEdgeMask |= (1 << 3) | (1 << 2);
+                    }
                     boundaryEdgeMask |= nonManEdgeMask;
                 }
 
@@ -1098,14 +1122,26 @@ PatchTableFactory::populateAdaptivePatches(
     EndCapBSplineBasisPatchFactory *endCapBSpline = NULL;
     EndCapGregoryBasisPatchFactory *endCapGregoryBasis = NULL;
     EndCapLegacyGregoryPatchFactory *endCapLegacyGregory = NULL;
+    StencilTable *localPointStencils = NULL;
+    StencilTable *localPointVaryingStencils = NULL;
 
     switch(context.options.GetEndCapType()) {
     case Options::ENDCAP_GREGORY_BASIS:
+        localPointStencils = new StencilTable(0);
+        localPointVaryingStencils = new StencilTable(0);
         endCapGregoryBasis = new EndCapGregoryBasisPatchFactory(
-            refiner, context.options.shareEndCapPatchPoints);
+            refiner,
+            localPointStencils,
+            localPointVaryingStencils,
+            context.options.shareEndCapPatchPoints);
         break;
     case Options::ENDCAP_BSPLINE_BASIS:
-        endCapBSpline = new EndCapBSplineBasisPatchFactory(refiner);
+        localPointStencils = new StencilTable(0);
+        localPointVaryingStencils = new StencilTable(0);
+        endCapBSpline = new EndCapBSplineBasisPatchFactory(
+            refiner,
+            localPointStencils,
+            localPointVaryingStencils);
         break;
     case Options::ENDCAP_LEGACY_GREGORY:
         endCapLegacyGregory = new EndCapLegacyGregoryPatchFactory(refiner);
@@ -1267,19 +1303,29 @@ PatchTableFactory::populateAdaptivePatches(
     }
 
     // finalize end patches
+    if (localPointStencils and localPointStencils->GetNumStencils() > 0) {
+        localPointStencils->finalize();
+    } else {
+        delete localPointStencils;
+        localPointStencils = NULL;
+    }
+
+    if (localPointVaryingStencils and localPointVaryingStencils->GetNumStencils() > 0) {
+        localPointVaryingStencils->finalize();
+    } else {
+        delete localPointVaryingStencils;
+        localPointVaryingStencils = NULL;
+    }
+
     switch(context.options.GetEndCapType()) {
     case Options::ENDCAP_GREGORY_BASIS:
-        table->_localPointStencils =
-            endCapGregoryBasis->CreateVertexStencilTable();
-        table->_localPointVaryingStencils =
-            endCapGregoryBasis->CreateVaryingStencilTable();
+        table->_localPointStencils = localPointStencils;
+        table->_localPointVaryingStencils = localPointVaryingStencils;
         delete endCapGregoryBasis;
         break;
     case Options::ENDCAP_BSPLINE_BASIS:
-        table->_localPointStencils =
-            endCapBSpline->CreateVertexStencilTable();
-        table->_localPointVaryingStencils =
-            endCapBSpline->CreateVaryingStencilTable();
+        table->_localPointStencils = localPointStencils;
+        table->_localPointVaryingStencils = localPointVaryingStencils;
         delete endCapBSpline;
         break;
     case Options::ENDCAP_LEGACY_GREGORY:

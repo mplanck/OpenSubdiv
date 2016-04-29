@@ -22,32 +22,27 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#ifndef OPENSUBDIV3_OSD_OPENGL_H
-#define OPENSUBDIV3_OSD_OPENGL_H
+#include "../common/shape_utils.h"
 
-#if defined(__APPLE__)
-    #include "TargetConditionals.h"
-    #if TARGET_OS_IPHONE or TARGET_IPHONE_SIMULATOR
-        #include <OpenGLES/ES2/gl.h>
-    #else
-        #if defined(OSD_USES_GLEW)
-            #include <GL/glew.h>
-        #else
-            #include <OpenGL/gl3.h>
-        #endif
-    #endif
-#elif defined(ANDROID)
-    #include <GLES2/gl2.h>
-#else
-    #if defined(_WIN32)
-        #define WIN32_LEAN_AND_MEAN
-        #include <windows.h>
-    #endif
-    #if defined(OSD_USES_GLEW)
-        #include <GL/glew.h>
-    #else
-        #include <GL/gl.h>
-    #endif
-#endif
+struct ShapeDesc {
 
-#endif  // OPENSUBDIV3_OSD_OPENGL_H
+    ShapeDesc(char const * iname, std::string const & idata, Scheme ischeme,
+              bool iisLeftHanded=false) :
+        name(iname), data(idata), scheme(ischeme), isLeftHanded(iisLeftHanded) { }
+
+    std::string name,
+                data;
+    Scheme      scheme;
+    bool        isLeftHanded;
+};
+
+static std::vector<ShapeDesc> g_shapes;
+
+#include "../shapes/all.h"
+
+//------------------------------------------------------------------------------
+static void initShapes() {
+    g_shapes.push_back( ShapeDesc("catmark_car",     catmark_car,   kCatmark ) );
+    g_shapes.push_back( ShapeDesc("catmark_pole64", catmark_pole64, kCatmark ) );
+}
+//------------------------------------------------------------------------------
